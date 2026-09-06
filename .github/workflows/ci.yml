@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - devops
+  pull_request:
+    branches:
+      - devops
+
+jobs:
+  docker-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build backend image
+        run: |
+          docker build \
+            -f devops/docker/backend.Dockerfile \
+            -t my-portfolio-backend:ci .
+
+      - name: Build frontend image
+        run: |
+          docker build \
+            --build-arg VITE_API_URL=http://localhost:5000 \
+            -f devops/docker/frontend.Dockerfile \
+            -t my-portfolio-frontend:ci .
