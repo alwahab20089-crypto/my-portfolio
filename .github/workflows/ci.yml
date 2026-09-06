@@ -8,6 +8,10 @@ on:
     branches:
       - devops
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   docker-build:
     runs-on: ubuntu-latest
@@ -15,13 +19,32 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
       - name: Create CI environment file
         run: |
           mkdir -p backend
           printf 'EMAIL_USER=ci@example.com\nEMAIL_PASS=ci-test-password\n' > backend/.env
-      - name: Build Docker images
+
+      - name: Log in to GHCR
+        if: github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build backend image
         run: |
-          docker compose -f devops/compose/docker-compose.yml build
+          docker build \
+            -f devops/docker/backend.Dockerfile \
+            -t ghcr.io/${{ github.repository_owner }}/my-portfolio-backend:latest .
+
+      - name: Build frontend image
+        run: |
+          docker build \
+            --build-arg VITE_API_URL=http://localhost:5000 \
+            -f devops/docker/frontend.Dockerfile \
+            -t ghcr.io/${{ github.repository_owner }}/my-portfolio-frontend:latest .
 
       - name: Start Docker Compose
         run: |
@@ -44,3 +67,13 @@ jobs:
         if: always()
         run: |
           docker compose -f devops/compose/docker-compose.yml down
+
+      - name: Push backend image to GHCR
+        if: github.event_name == 'push'
+        run: |
+          docker push ghcr.io/${{ github.repository_owner }}/my-portfolio-backend:latest
+
+      - name: Push frontend image to GHCR
+        if: github.event_name == 'push'
+        run: |
+          docker push ghcr.io/${{ github.repository_owner }}/my-portfolio-frontend:latest
